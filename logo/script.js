@@ -1,4 +1,4 @@
-// Referenzen zu den UI-Elementen
+// UI Element References
 const rotateX = document.getElementById('rotateX');
 const rotateY = document.getElementById('rotateY');
 const rotateZ = document.getElementById('rotateZ');
@@ -25,27 +25,22 @@ const easingEditorContainer = document.getElementById('easingEditorContainer');
 const easingHint = document.getElementById('easingHint');
 const ctx = easingCurveCanvas.getContext('2d');
 
-// Timeline-Konfiguration
-let timelineDuration = 10; // Sekunden, wird dynamisch angepasst
+// Timeline Configuration
+let timelineDuration = 10;
 let isDragging = false;
 
-// Keypoints speichern für jede Achse
+// Keypoints Data Structures
 let keypoints = {
   x: [],
   y: [],
   z: []
 };
 
-// Flag zur Vermeidung von Konflikten zwischen Echtzeit-Updates und Animation
-let isAnimating = false;
+let isAnimating = false; 
+let animationFrameId = null; 
+let keypointIdCounter = 0; 
 
-// Variable zur Speicherung des aktuellen Animation-Frame-IDs
-let animationFrameId = null;
-
-// Zähler für eindeutige Keypoint IDs
-let keypointIdCounter = 0;
-
-// Easing-Funktionen
+// Easing Functions
 const easingFunctions = {
   'linear': function(t) { return t; },
   'ease-in': function(t) { return t * t; },
@@ -53,15 +48,13 @@ const easingFunctions = {
   'ease-in-out': function(t) {
     return t < 0.5 ? (2 * t * t) : (-1 + (4 - 2 * t) * t);
   },
-  // Weitere Easing-Funktionen können hier hinzugefügt werden
 };
 
-// Funktion zum Aktualisieren der Transformation basierend auf den aktuellen Werten
+// Transformation Functions
 function updateTransform(rotation) {
   container.style.transform = `rotateX(${rotation.x}deg) rotateY(${rotation.y}deg) rotateZ(${rotation.z}deg)`;
 }
 
-// Funktion zum Aktualisieren der aktuellen Rotation
 function getCurrentRotation() {
   return {
     x: parseInt(rotateX.value),
@@ -70,14 +63,12 @@ function getCurrentRotation() {
   };
 }
 
-// Funktion zur Interpolation zwischen zwei Keyframes
 function interpolate(a, b, t, easing) {
   let easedT;
   if (Array.isArray(easing)) {
-    // Benutzerdefinierte Bezier-Kurve verwenden
     const [p1, p2] = easing;
-    easedT = cubicBezier(t, 0, p1.x, p2.x, 1); // Bezier-Kurve auf t anwenden
-    const bezierY = cubicBezier(easedT, 0, p1.y, p2.y, 1); // Y-Wert berechnen
+    easedT = cubicBezier(t, 0, p1.x, p2.x, 1);
+    const bezierY = cubicBezier(easedT, 0, p1.y, p2.y, 1);
     easedT = bezierY;
   } else {
     const easeFunc = easingFunctions[easing] || easingFunctions['linear'];
@@ -86,7 +77,6 @@ function interpolate(a, b, t, easing) {
   return a + (b - a) * easedT;
 }
 
-// Funktion zum Berechnen der Rotationswerte zu einer bestimmten Zeit
 function getRotationAtTime(time) {
   const rotation = { x: 0, y: 0, z: 0 };
 
@@ -114,10 +104,9 @@ function getRotationAtTime(time) {
       if (time >= currentKp.time && time <= nextKp.time) {
         const t = (time - currentKp.time) / (nextKp.time - currentKp.time);
 
-        // Verwende die Easing-Funktion des Segments zwischen currentKp und nextKp
         let easing = nextKp.easing || 'linear';
         if (nextKp.easingFunction) {
-          easing = nextKp.easingFunction; // Benutzerdefinierte Kurve verwenden
+          easing = nextKp.easingFunction;
         }
 
         rotation[axis] = interpolate(currentKp.value, nextKp.value, t, easing);
@@ -129,7 +118,6 @@ function getRotationAtTime(time) {
   return rotation;
 }
 
-// Funktion zum Aktualisieren der Steuerungselemente basierend auf der Zeit
 function updateControls(time) {
   const rotation = getRotationAtTime(time);
   rotateX.value = rotation.x;
@@ -140,11 +128,11 @@ function updateControls(time) {
   rotateYNum.value = rotation.y;
   rotateZNum.value = rotation.z;
 
-  // Aktualisiere die Transformationsansicht
   updateTransform(rotation);
 }
 
-// Echtzeit-Updates und Synchronisation für X
+// Event Listeners for Rotation Controls (X, Y, Z)
+// X-axis
 rotateX.addEventListener('input', () => {
   rotateXNum.value = rotateX.value;
   if (!isAnimating) {
@@ -159,7 +147,6 @@ rotateXNum.addEventListener('input', () => {
   }
 });
 
-// Event Listener für Enter-Taste in den numerischen Eingabefeldern
 rotateXNum.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
     rotateX.value = rotateXNum.value;
@@ -170,7 +157,7 @@ rotateXNum.addEventListener('keydown', (e) => {
   }
 });
 
-// Echtzeit-Updates und Synchronisation für Y
+// Y-axis
 rotateY.addEventListener('input', () => {
   rotateYNum.value = rotateY.value;
   if (!isAnimating) {
@@ -195,7 +182,7 @@ rotateYNum.addEventListener('keydown', (e) => {
   }
 });
 
-// Echtzeit-Updates und Synchronisation für Z
+// Z-axis
 rotateZ.addEventListener('input', () => {
   rotateZNum.value = rotateZ.value;
   if (!isAnimating) {
@@ -220,41 +207,51 @@ rotateZNum.addEventListener('keydown', (e) => {
   }
 });
 
-// Funktion zum Hinzufügen eines Keypoints
+// Keypoint Functions
 function addKeypoint(axis) {
   const pointerPosition = parseFloat(timelinePointer.style.left) / timeline.offsetWidth * timelineDuration;
 
-  // Runde die Zeit auf das nächste 0,2-Sekunden-Intervall
   const snappedTime = Math.round(pointerPosition / 0.2) * 0.2;
 
   const currentRotation = getCurrentRotation();
   let value = currentRotation[axis];
 
-  // Erstellen des Keypoints
   const keypoint = {
-    id: `kp-${keypointIdCounter++}`, // Eindeutige ID
-    time: parseFloat(snappedTime.toFixed(1)), // Gerundete Zeit
+    id: `kp-${keypointIdCounter++}`,
+    time: parseFloat(snappedTime.toFixed(1)),
     value: value,
-    easing: 'linear', // Standardmäßig 'linear'
-    easingFunction: null // Platz für benutzerdefinierte Kurve
+    easing: 'linear',
+    easingFunction: null
   };
 
-  // Hinzufügen zum entsprechenden Keypoints-Array
   keypoints[axis].push(keypoint);
-  keypoints[axis].sort((a, b) => a.time - b.time); // Sortiere nach Zeit
+  keypoints[axis].sort((a, b) => a.time - b.time);
 
   renderKeypoints(axis);
-  updateTimelineDuration(false); // Verhindere das Zurücksetzen des Zeigers
+  updateTimelineDuration(false);
 }
 
-// Event Listener für die Plus-Buttons
 addKeypointX.addEventListener('click', () => addKeypoint('x'));
 addKeypointY.addEventListener('click', () => addKeypoint('y'));
 addKeypointZ.addEventListener('click', () => addKeypoint('z'));
 
-// Funktion zum Rendern der Keypoints auf der Timeline
+function deleteKeypoint(axis, id) {
+  keypoints[axis] = keypoints[axis].filter(kp => kp.id !== id);
+  renderKeypoints(axis);
+  updateTimelineDuration();
+  if (selectedKeypoint && selectedKeypoint.id === id) {
+    selectedKeypoint = null;
+    updateSelectedKeypointUI();
+    hideEasingEditor();
+  }
+}
+
+function getKeypointById(axis, id) {
+  return keypoints[axis].find(kp => kp.id === id);
+}
+
+// Timeline Functions
 function renderKeypoints(axis) {
-  // Entferne vorhandene Marker und Linien für die Achse
   const existingMarkers = document.querySelectorAll(`.keypoint-marker-${axis}`);
   existingMarkers.forEach(marker => marker.remove());
 
@@ -272,7 +269,7 @@ function renderKeypoints(axis) {
   for (let i = 0; i < sortedKeypoints.length; i++) {
     const kp = sortedKeypoints[i];
 
-    // Keypoint Marker erstellen
+    // Create keypoint marker
     const marker = document.createElement('div');
     marker.classList.add('keypoint-marker', `keypoint-marker-${axis}`, `keypoint-${axis}`);
     marker.setAttribute('data-id', kp.id);
@@ -280,94 +277,73 @@ function renderKeypoints(axis) {
     const positionPercent = (kp.time / timelineDuration) * 100;
     marker.style.left = `calc(${positionPercent}% )`;
 
-    // Delete-Button hinzufügen
+    // Add delete button
     const deleteBtn = document.createElement('div');
     deleteBtn.classList.add('delete-button');
     deleteBtn.textContent = '+';
     marker.appendChild(deleteBtn);
 
-    // Event Listener für das Löschen des Keypoints
+    // Event listeners
     deleteBtn.addEventListener('click', (e) => {
-      e.stopPropagation(); // Verhindere das Auslösen anderer Events
+      e.stopPropagation();
       deleteKeypoint(axis, kp.id);
     });
 
-    // Event Listener für das Auswählen des Keypoints
     marker.addEventListener('click', (e) => {
       if (e.target === deleteBtn) return;
       selectKeypoint(axis, kp.id);
     });
 
-    // Event Listener für Drag-and-Drop
     marker.addEventListener('mousedown', (e) => {
-      if (e.button !== 0) return; // Nur linke Maustaste
+      if (e.button !== 0) return;
       if (e.target === deleteBtn) return;
       startDrag(e, axis, kp.id);
     });
 
-    // Easing-Funktion anzeigen
     marker.title = `Easing: ${kp.easing}`;
 
     timeline.appendChild(marker);
 
-    // Linie zum nächsten Keypoint zeichnen
-    // Linie zum nächsten Keypoint zeichnen
-if (i < sortedKeypoints.length - 1) {
-  const nextKp = sortedKeypoints[i + 1];
-  const line = document.createElement('div');
-  line.classList.add('keypoint-line', `keypoint-line-${axis}`);
+    // Draw line to next keypoint
+    if (i < sortedKeypoints.length - 1) {
+      const nextKp = sortedKeypoints[i + 1];
+      const line = document.createElement('div');
+      line.classList.add('keypoint-line', `keypoint-line-${axis}`);
 
-  const startPercent = (kp.time / timelineDuration) * 100;
-  const endPercent = (nextKp.time / timelineDuration) * 100;
+      const startPercent = (kp.time / timelineDuration) * 100;
+      const endPercent = (nextKp.time / timelineDuration) * 100;
 
-  line.style.left = `calc(${startPercent}% )`;
-  line.style.width = `calc(${endPercent - startPercent}% )`;
+      line.style.left = `calc(${startPercent}% )`;
+      line.style.width = `calc(${endPercent - startPercent}% )`;
 
-  // Positionieren der Linie genau auf der grauen Linie
-  const lineTopPositions = {
-    'x': '20px', // 20px (graue Linie) - 1px (halbe Höhe der Linie)
-    'y': '50px', // 50px - 1px
-    'z': '80px'  // 80px - 1px
-  };
-  line.style.top = lineTopPositions[axis];
-  line.style.height = '0'; // Höhe auf 0 setzen
+      const lineTopPositions = {
+        'x': '20px',
+        'y': '50px',
+        'z': '80px'
+      };
+      line.style.top = lineTopPositions[axis];
+      line.style.height = '0';
 
-  // Unterschiedliche Striche für unterschiedliche Easings
-  const easing = nextKp.easing || 'linear';
-  let borderStyle = 'solid';
-  if (easing === 'ease-in') {
-    borderStyle = 'dotted';
-  } else if (easing === 'ease-out') {
-    borderStyle = 'dashed';
-  } else if (easing === 'ease-in-out') {
-    borderStyle = 'double';
-  }
+      const easing = nextKp.easing || 'linear';
+      let borderStyle = 'solid';
+      if (easing === 'ease-in') {
+        borderStyle = 'dotted';
+      } else if (easing === 'ease-out') {
+        borderStyle = 'dashed';
+      } else if (easing === 'ease-in-out') {
+        borderStyle = 'double';
+      }
 
-  line.style.borderTop = `2px ${borderStyle} ${axisColor[axis]}`;
+      line.style.borderTop = `2px ${borderStyle} ${axisColor[axis]}`;
 
-  timeline.appendChild(line);
-}
-
+      timeline.appendChild(line);
+    }
   }
 
   updateSelectedKeypointUI();
 }
 
-// Funktion zum Löschen eines Keypoints
-function deleteKeypoint(axis, id) {
-  keypoints[axis] = keypoints[axis].filter(kp => kp.id !== id);
-  renderKeypoints(axis);
-  updateTimelineDuration();
-  if (selectedKeypoint && selectedKeypoint.id === id) {
-    selectedKeypoint = null;
-    updateSelectedKeypointUI();
-    hideEasingEditor();
-  }
-}
-
-// Funktion zum Hinzufügen von Zeitlabels auf der Timeline
 function addTimelineLabels() {
-  // Entferne vorhandene Labels
   timelineLabels.innerHTML = '';
   for (let t = 0; t <= timelineDuration; t += 0.2) {
     const label = document.createElement('div');
@@ -379,10 +355,8 @@ function addTimelineLabels() {
   }
 }
 
-// Initialisiere die Timeline-Labels
 addTimelineLabels();
 
-// Funktion zur Aktualisierung der Timeline-Dauer basierend auf den Keypoints
 function updateTimelineDuration(shouldResetPointer = true) {
   let maxTime = timelineDuration;
   ['x', 'y', 'z'].forEach(axis => {
@@ -393,21 +367,16 @@ function updateTimelineDuration(shouldResetPointer = true) {
     });
   });
 
-  // Optional: Setze eine Mindestdauer
-  maxTime = Math.max(maxTime, 2); // Mindestdauer von 2 Sekunden
-
+  maxTime = Math.max(maxTime, 2);
   timelineDuration = maxTime;
 
-  // Aktualisiere die Timeline-Zeiger-Position falls nötig
   if (shouldResetPointer && !isDragging && !isAnimating) {
     timelinePointer.style.left = '0px';
     updateControls(0);
   }
 
-  // Aktualisiere die Labels
   addTimelineLabels();
 
-  // Aktualisiere die Position der Keypoints-Markierungen
   ['x', 'y', 'z'].forEach(axis => {
     const markers = document.querySelectorAll(`.keypoint-marker-${axis}`);
     markers.forEach(marker => {
@@ -421,7 +390,7 @@ function updateTimelineDuration(shouldResetPointer = true) {
   });
 }
 
-// Timeline-Zeiger bewegen
+// Timeline Pointer Movement
 timelinePointer.style.left = '0px';
 
 timeline.addEventListener('mousedown', (e) => {
@@ -434,15 +403,12 @@ document.addEventListener('mouseup', () => {
     isDragging = false;
     let currentTime = (parseFloat(timelinePointer.style.left) / timeline.offsetWidth) * timelineDuration;
 
-    // Überprüfen, ob die Zeit nahe bei 0 ist
     if (currentTime < 0.1) {
       currentTime = 0;
     } else {
-      // Runde die Zeit auf das nächste 0,2-Sekunden-Intervall
       currentTime = Math.round(currentTime / 0.2) * 0.2;
     }
 
-    // Aktualisiere die Zeigerposition basierend auf der gerundeten Zeit
     const x = (currentTime / timelineDuration) * timeline.offsetWidth;
     timelinePointer.style.left = `${x}px`;
 
@@ -459,20 +425,16 @@ document.addEventListener('mousemove', (e) => {
 function movePointer(e) {
   const rect = timeline.getBoundingClientRect();
   let x = e.clientX - rect.left;
-  x = Math.max(0, Math.min(x, rect.width)); // Begrenze innerhalb der Timeline
+  x = Math.max(0, Math.min(x, rect.width));
 
-  // Berechne die Zeit aus der Position
   let currentTime = (x / rect.width) * timelineDuration;
 
-  // Überprüfen, ob die Zeit nahe bei 0 ist
   if (currentTime < 0.1) {
     currentTime = 0;
   } else {
-    // Runde die Zeit auf das nächste 0,2-Sekunden-Intervall
     currentTime = Math.round(currentTime / 0.2) * 0.2;
   }
 
-  // Berechne die neue Zeigerposition aus der gerundeten Zeit
   x = (currentTime / timelineDuration) * rect.width;
 
   timelinePointer.style.left = `${x}px`;
@@ -480,27 +442,24 @@ function movePointer(e) {
   updateControls(currentTime);
 }
 
-// Play-Button Event Listener
+// Animation Functions
 playButton.addEventListener('click', () => {
   if (isAnimating) {
-    // Animation manuell stoppen und Zeiger auf 0 zurücksetzen
     stopAnimation(true);
   } else {
     const totalKeypoints = keypoints.x.length + keypoints.y.length + keypoints.z.length;
     if (totalKeypoints < 2) {
-      console.warn('Füge mindestens zwei Keypoints hinzu, um die Animation zu starten.');
+      console.warn('Add at least two keypoints to start the animation.');
       return;
     }
-    // Zeiger auf 0 setzen, bevor die Animation startet
     timelinePointer.style.left = '0px';
     updateControls(0);
     playAnimation();
   }
 });
 
-// Funktion zum Abspielen der Animation basierend auf Keypoints
 function playAnimation() {
-  isAnimating = true; // Flag setzen
+  isAnimating = true;
   playButton.classList.add('red');
   playButton.innerHTML = '<img src="stop.svg" alt="Stop">';
 
@@ -510,26 +469,21 @@ function playAnimation() {
   const startTime = performance.now();
 
   function animate(currentTime) {
-    const elapsed = (currentTime - startTime) / 1000; // Sekunden
+    const elapsed = (currentTime - startTime) / 1000;
 
     if (elapsed >= animationDuration) {
-      // Setze die letzten Werte für jede Achse
       const finalRotation = getRotationAtTime(animationDuration);
       updateTransform(finalRotation);
       updateTimelinePointer(animationDuration);
 
-      // Animation stoppen, aber Zeiger nicht zurücksetzen
       stopAnimation(false);
       return;
     }
 
-    // Aktuelle Werte für jede Achse berechnen
     const currentRotation = getRotationAtTime(elapsed);
 
-    // Aktualisiere die Transformation
     updateTransform(currentRotation);
 
-    // Aktualisiere die Steuerungselemente
     rotateX.value = currentRotation.x;
     rotateY.value = currentRotation.y;
     rotateZ.value = currentRotation.z;
@@ -538,19 +492,16 @@ function playAnimation() {
     rotateYNum.value = currentRotation.y;
     rotateZNum.value = currentRotation.z;
 
-    // Aktualisiere den Zeiger
     updateTimelinePointer(elapsed);
 
-    // Fortsetzen der Animation
     animationFrameId = requestAnimationFrame(animate);
   }
 
   animationFrameId = requestAnimationFrame(animate);
 }
 
-// Funktion zum Stoppen der Animation
 function stopAnimation(resetToZero = true) {
-  isAnimating = false; // Flag zurücksetzen
+  isAnimating = false;
   playButton.classList.remove('red');
   playButton.innerHTML = '<img src="start.svg" alt="Start">';
   if (animationFrameId) {
@@ -558,27 +509,22 @@ function stopAnimation(resetToZero = true) {
   }
 
   if (resetToZero) {
-    // Zeiger auf 0 setzen
     timelinePointer.style.left = '0px';
-    // Steuerungselemente aktualisieren
     updateControls(0);
   }
 }
 
-// Leertaste zum Steuern der Animation
 document.addEventListener('keydown', (e) => {
   if (e.code === 'Space') {
-    e.preventDefault(); // Verhindert das Scrollen der Seite
+    e.preventDefault();
     if (isAnimating) {
-      // Animation manuell stoppen und Zeiger auf 0 zurücksetzen
       stopAnimation(true);
     } else {
       const totalKeypoints = keypoints.x.length + keypoints.y.length + keypoints.z.length;
       if (totalKeypoints < 2) {
-        console.warn('Füge mindestens zwei Keypoints hinzu, um die Animation zu starten.');
+        console.warn('Add at least two keypoints to start the animation.');
         return;
       }
-      // Zeiger auf 0 setzen, bevor die Animation startet
       timelinePointer.style.left = '0px';
       updateControls(0);
       playAnimation();
@@ -586,13 +532,11 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// Funktion zum Aktualisieren des Zeigers während der Animation
 function updateTimelinePointer(elapsed) {
   const positionPercent = (elapsed / timelineDuration) * 100;
   timelinePointer.style.left = `calc(${positionPercent}% )`;
 }
 
-// Funktion zur Bestimmung der letzten Keyframe-Zeit
 function getLastKeyframeTime() {
   let maxTime = 0;
   ['x', 'y', 'z'].forEach(axis => {
@@ -605,16 +549,13 @@ function getLastKeyframeTime() {
   return maxTime;
 }
 
-// Funktion zur Aktualisierung der Steuerungselemente beim Bewegen des Zeigers außerhalb der Animation
 function handlePointerMoveOutsideAnimation() {
   if (!isAnimating) {
     let currentTime = (parseFloat(timelinePointer.style.left) / timeline.offsetWidth) * timelineDuration;
 
-    // Überprüfen, ob die Zeit nahe bei 0 ist
     if (currentTime < 0.1) {
       currentTime = 0;
     } else {
-      // Runde die Zeit auf das nächste 0,2-Sekunden-Intervall
       currentTime = Math.round(currentTime / 0.2) * 0.2;
     }
 
@@ -622,13 +563,12 @@ function handlePointerMoveOutsideAnimation() {
   }
 }
 
-// Event Listener für die Zeigerbewegung außerhalb der Animation
 timelinePointer.addEventListener('mouseup', handlePointerMoveOutsideAnimation);
 
-// Initiale Transformation setzen
+// Initial Transformation
 updateTransform({ x: 0, y: 0, z: 0 });
 
-// Funktionen für Drag-and-Drop der Keypoints
+// Drag-and-Drop Functions for Keypoints
 let draggingKeypoint = null;
 let dragAxis = null;
 let dragId = null;
@@ -646,26 +586,20 @@ function onDrag(e) {
 
   const rect = timeline.getBoundingClientRect();
   let x = e.clientX - rect.left;
-  x = Math.max(0, Math.min(x, rect.width)); // Begrenze innerhalb der Timeline
+  x = Math.max(0, Math.min(x, rect.width));
 
-  // Berechne die neue Zeit aus der Position
   let newTime = (x / rect.width) * timelineDuration;
 
-  // Überprüfen, ob die Zeit nahe bei 0 ist
   if (newTime < 0.1) {
     newTime = 0;
   } else {
-    // Runde die Zeit auf das nächste 0,2-Sekunden-Intervall
     newTime = Math.round(newTime / 0.2) * 0.2;
   }
 
-  // Berechne die neue Position aus der gerundeten Zeit
   x = (newTime / timelineDuration) * rect.width;
 
-  // Aktualisiere die Position des Keypoints
   draggingKeypoint.style.left = `${(x / rect.width) * 100}%`;
 
-  // Aktualisiere den Keypoint in der Datenstruktur
   const kpIndex = keypoints[dragAxis].findIndex(kp => kp.id === dragId);
   if (kpIndex !== -1) {
     keypoints[dragAxis][kpIndex].time = parseFloat(newTime.toFixed(1));
@@ -683,23 +617,18 @@ function stopDrag() {
   document.removeEventListener('mouseup', stopDrag);
 }
 
-// Keypoint-Auswahl ermöglichen
+// Keypoint Selection
 let selectedKeypoint = null;
 
 function selectKeypoint(axis, id) {
-  // Speichern des ausgewählten Keypoints
   selectedKeypoint = { axis, id };
-
-  // Aktualisieren der UI, um den ausgewählten Keypoint hervorzuheben
   updateSelectedKeypointUI();
 }
 
 function updateSelectedKeypointUI() {
-  // Entfernen der Hervorhebung von allen Keypoints
   const allMarkers = document.querySelectorAll('.keypoint-marker');
   allMarkers.forEach(marker => marker.classList.remove('selected-keypoint'));
 
-  // Hervorheben des ausgewählten Keypoint
   if (selectedKeypoint) {
     const { axis, id } = selectedKeypoint;
     const marker = document.querySelector(`.keypoint-marker-${axis}[data-id='${id}']`);
@@ -712,19 +641,13 @@ function updateSelectedKeypointUI() {
   }
 }
 
-// Funktion zum Abrufen eines Keypoints nach ID
-function getKeypointById(axis, id) {
-  return keypoints[axis].find(kp => kp.id === id);
-}
-
-// Easing-Kurveneditor
+// Easing Curve Editor
 easingPreset.addEventListener('change', () => {
   if (selectedKeypoint) {
     const kp = getKeypointById(selectedKeypoint.axis, selectedKeypoint.id);
     if (kp) {
       kp.easing = easingPreset.value;
-      kp.easingFunction = null; // Benutzerdefinierte Kurve zurücksetzen
-      // Aktualisieren der Kurve im Editor
+      kp.easingFunction = null;
       updateEasingCurveEditor(kp.easing);
       renderKeypoints(selectedKeypoint.axis);
     }
@@ -736,26 +659,19 @@ let controlPoints = [{ x: 0.25, y: 0.25 }, { x: 0.75, y: 0.75 }];
 function showEasingCurveEditor() {
   const kp = getKeypointById(selectedKeypoint.axis, selectedKeypoint.id);
   if (kp) {
-    // Setzen des Dropdowns auf die aktuelle Easing-Funktion
     easingPreset.value = kp.easing || 'linear';
-    // Aktualisieren der Kurve
     updateEasingCurveEditor(kp.easing);
-    // Hinweistext ausblenden und Canvas anzeigen
     easingHint.style.display = 'none';
     easingCurveCanvas.style.display = 'block';
-    // easingPreset.disabled = false; // Entfernt, damit das Dropdown immer aktiv ist
   }
 }
 
 function hideEasingEditor() {
-  // Hinweistext anzeigen und Canvas ausblenden
   easingHint.style.display = 'block';
   easingCurveCanvas.style.display = 'none';
-  // easingPreset.disabled = true; // Entfernt, damit das Dropdown immer aktiv ist
 }
 
 function updateEasingCurveEditor(easing) {
-  // Basierend auf der ausgewählten Easing-Funktion die Kontrollpunkte setzen
   switch (easing) {
     case 'linear':
       controlPoints = [{ x: 0, y: 0 }, { x: 1, y: 1 }];
@@ -774,7 +690,6 @@ function updateEasingCurveEditor(easing) {
       break;
   }
 
-  // Wenn der Keypoint eine benutzerdefinierte Kurve hat
   if (selectedKeypoint) {
     const kp = getKeypointById(selectedKeypoint.axis, selectedKeypoint.id);
     if (kp && kp.easingFunction) {
@@ -786,7 +701,7 @@ function updateEasingCurveEditor(easing) {
 }
 
 function drawEasingCurve() {
-  const padding = 10; // Platz für die Handles
+  const padding = 10;
   const canvasWidth = easingCurveCanvas.width - padding * 2;
   const canvasHeight = easingCurveCanvas.height - padding * 2;
 
@@ -802,7 +717,6 @@ function drawEasingCurve() {
   }
   ctx.stroke();
 
-  // Zeichnen der Kontrollpunkte
   ctx.fillStyle = 'red';
   controlPoints.forEach(point => {
     ctx.beginPath();
@@ -813,9 +727,7 @@ function drawEasingCurve() {
   });
 }
 
-
 function cubicBezier(t, p0, p1, p2, p3) {
-  // Berechnung des Bezier-Werts für t
   return (
     Math.pow(1 - t, 3) * p0 +
     3 * Math.pow(1 - t, 2) * t * p1 +
@@ -824,12 +736,12 @@ function cubicBezier(t, p0, p1, p2, p3) {
   );
 }
 
-// Event Listener für Drag & Drop der Kontrollpunkte
+// Drag & Drop for Control Points
 let draggingPoint = null;
 
 easingCurveCanvas.addEventListener('mousedown', (e) => {
   const rect = easingCurveCanvas.getBoundingClientRect();
-  const padding = 10; // Stelle sicher, dass das Padding konsistent ist
+  const padding = 10;
   const canvasWidth = easingCurveCanvas.width - padding * 2;
   const canvasHeight = easingCurveCanvas.height - padding * 2;
 
@@ -861,7 +773,6 @@ document.addEventListener('mousemove', (e) => {
     controlPoints[draggingPoint] = { x, y };
     drawEasingCurve();
 
-    // Speichern der neuen Easing-Funktion im Keypoint
     if (selectedKeypoint) {
       const kp = getKeypointById(selectedKeypoint.axis, selectedKeypoint.id);
       if (kp) {
@@ -878,14 +789,12 @@ document.addEventListener('mouseup', () => {
   draggingPoint = null;
 });
 
-
-// Funktion zum Generieren und Downloaden des Animationscodes
+// Download Functionality
 downloadButton.addEventListener('click', () => {
   downloadAnimation();
 });
 
 function downloadAnimation() {
-  // HTML-Code ohne UI-Elemente
   const animationHTML = `
 <!DOCTYPE html>
 <html lang="de">
@@ -912,7 +821,6 @@ function downloadAnimation() {
 </html>
   `;
 
-  // Blob erstellen und Download initiieren
   const blob = new Blob([animationHTML], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
 
@@ -921,13 +829,10 @@ function downloadAnimation() {
   link.download = 'animation.html';
   link.click();
 
-  // URL freigeben
   URL.revokeObjectURL(url);
 }
 
-// Funktion zum Extrahieren des benötigten CSS-Codes
 function getAnimationCSS() {
-  // Generiere die CSS-Animationen und Keyframes
   const cssAnimation = generateCSSAnimation();
 
   return `
@@ -943,24 +848,24 @@ body {
 .animation-container {
   position: relative;
   width: 400px;
-  height: 400px; 
-  transform-style: preserve-3d; 
-  overflow: visible; 
+  height: 400px;
+  transform-style: preserve-3d;
+  overflow: visible;
   will-change: transform;
 }
 
-/* Animationen */
+/* Animations */
 ${cssAnimation}
 
-/* Restliche CSS-Regeln */
+/* Other CSS rules */
 .square {
   position: absolute;
   width: 200px;
   height: 200px;
   border-radius: 30px;
-  top: 50%; 
+  top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%) translateZ(0px); 
+  transform: translate(-50%, -50%) translateZ(0px);
   background: linear-gradient(135deg, var(--color-start), var(--color-end));
 }
 
@@ -989,48 +894,42 @@ ${cssAnimation}
   position: absolute;
   width: 61.5px;
   height: 67px;
-  top: 45%; 
-  left: 45%; 
+  top: 45%;
+  left: 45%;
   transform: rotate(315deg) translateZ(140px);
 }
 
-.cursorShadow {  
+.cursorShadow {
   position: absolute;
   width: 61.5px;
   height: 67px;
-  top: 45%; 
+  top: 45%;
   left: 45%;
   transform: rotate(315deg) translateZ(121px);
 }
 
 .cursorShadow img {
   width: 100%;
-  height: 100%; 
+  height: 100%;
   filter: brightness(0) saturate(100%) blur(4px);
-  opacity: 0.1; 
+  opacity: 0.1;
 }
 `;
 }
 
-// Funktion zum Generieren der CSS-Animation basierend auf den Keypoints
 function generateCSSAnimation() {
   const animationDuration = getLastKeyframeTime();
   let keyframesCSS = '';
-  let animationProperties = [];
-
-  // Erstellen der Keyframes mit individuellen Easing-Funktionen
-  keyframesCSS += `@keyframes rotateAnimation {\n`;
-
-  const keyframeSteps = [];
-
-  // Sammle alle einzigartigen Zeiten der Keypoints
   let keypointTimes = new Set();
+
   ['x', 'y', 'z'].forEach(axis => {
     keypoints[axis].forEach(kp => {
       keypointTimes.add(kp.time);
     });
   });
   keypointTimes = Array.from(keypointTimes).sort((a, b) => a - b);
+
+  keyframesCSS += `@keyframes rotateAnimation {\n`;
 
   keypointTimes.forEach(time => {
     const percentage = (time / animationDuration) * 100;
@@ -1043,7 +942,6 @@ function generateCSSAnimation() {
 
   keyframesCSS += `}\n`;
 
-  // Animationseigenschaften
   const animationCSS = `
 .animation-container {
   animation: rotateAnimation ${animationDuration}s linear forwards;
@@ -1053,7 +951,7 @@ function generateCSSAnimation() {
   return keyframesCSS + animationCSS;
 }
 
-// Initialisierung beim Laden der Seite
+// Initialization
 document.addEventListener('DOMContentLoaded', () => {
   hideEasingEditor();
 });
