@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Logo Animation mit Timeline</title>
+  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <div class="logo-container">
+    <img src="logo.svg" alt="Logo" class="logo">
+  </div>
+
+  <div class="button-container">
+    <button class="play-button" id="playButton">
+      <img src="start.svg" alt="Start">
+    </button>
+    <button class="download-button" id="downloadButton">
+      <img src="download.svg" alt="Download">
+    </button>
+  </div>
+
+  <div class="main-container">
+    <div class="animation-wrapper">
+      <div class="animation-container" id="animationContainer">
+        <div class="cursor">
+          <img src="Cursor.svg" alt="Cursor" width="125%" height="125%">
+        </div>
+        <div class="cursorShadow">
+          <img src="Cursor.svg" alt="Cursor" width="125%" height="125%">
+        </div>
+        <div class="square front"></div>
+        <div class="square middle"></div>
+        <div class="square back"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar">
+    <div class="controls">
+      <div class="card">
+        <h3>Rotation</h3>
+        <div class="control-group">
+          <label for="rotateX">X:</label>
+          <input type="range" id="rotateX" min="-360" max="360" value="0">
+          <input type="number" id="rotateXNum" min="-360" max="360" value="0">
+          <button class="add-keypoint-button" id="addKeypointX">
+            <img src="plus.svg" alt="Add">
+          </button>
+        </div>
+  
+        <div class="control-group">
+          <label for="rotateY">Y:</label>
+          <input type="range" id="rotateY" min="-360" max="360" value="0">
+          <input type="number" id="rotateYNum" min="-360" max="360" value="0">
+          <button class="add-keypoint-button" id="addKeypointY">
+            <img src="plus.svg" alt="Add">
+          </button>
+        </div>
+  
+        <div class="control-group">
+          <label for="rotateZ">Z:</label>
+          <input type="range" id="rotateZ" min="-360" max="360" value="0">
+          <input type="number" id="rotateZNum" min="-360" max="360" value="0">
+          <button class="add-keypoint-button" id="addKeypointZ">
+            <img src="plus.svg" alt="Add">
+          </button>
+        </div>
+      </div>
+  
+
+      <div class="card" id="easingEditorContainer">
+  <h3>Easing Editor</h3>
+  <label for="easingPreset">Easing Voreinstellung:</label>
+  <select id="easingPreset">
+    <option value="linear">Linear</option>
+    <option value="ease-in">Ease-In</option>
+    <option value="ease-out">Ease-Out</option>
+    <option value="ease-in-out">Ease-In-Out</option>
+    <option value="custom">Benutzerdefiniert</option>
+  </select>
+  <div id="easingHint" style="text-align: center; color: gray; margin-top: 50px;">
+    Bitte wähle einen Keypoint aus, um die Easing-Kurve zu bearbeiten.
+  </div>
+  <canvas id="easingCurveCanvas" width="200" height="200"></canvas>
+</div>
+  
+
+  <div class="timeline-container">
+    <div class="timeline" id="timeline">
+      <div class="timeline-bar timeline-bar-x"></div>
+      <div class="timeline-bar timeline-bar-y"></div>
+      <div class="timeline-bar timeline-bar-z"></div>
+      <div class="timeline-pointer" id="timelinePointer"></div>
+    </div>
+    <div class="timeline-labels" id="timelineLabels">
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
